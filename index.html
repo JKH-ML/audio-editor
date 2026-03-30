@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AudioToolbox - Modern MP3 Editor</title>
+    <!-- 외부 라이브러리 및 폰트 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/browser-id3-writer@4.4.0/dist/browser-id3-writer.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <nav class="navbar">
+        <div class="nav-left">
+            <div class="nav-logo">
+                <i class="fas fa-wave-square"></i>
+                <span>AudioToolbox</span>
+            </div>
+            <div class="nav-tabs">
+                <div class="nav-tab active" data-target="page-tagger" data-i18n="nav_tagger">Tagger</div>
+                <div class="nav-tab" data-target="page-cutter" data-i18n="nav_cutter">Cutter</div>
+                <div class="nav-tab" data-target="page-merger" data-i18n="nav_merger">Merger</div>
+                <div class="nav-tab" data-target="page-converter" data-i18n="nav_converter">Converter</div>
+            </div>
+        </div>
+        <div class="nav-right">
+            <select id="lang-select">
+                <option value="ko">🇰🇷 한국어</option>
+                <option value="en">🇺🇸 English</option>
+                <option value="zh">🇨🇳 中文</option>
+                <option value="ja">🇯🇵 日本語</option>
+            </select>
+            <button id="theme-toggle" class="theme-toggle" title="Toggle Theme">
+                <i class="fas fa-moon"></i>
+            </button>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- Tagger Page -->
+        <section id="page-tagger" class="page active">
+            <div class="card">
+                <div style="margin-bottom: 2rem;">
+                    <h2 class="card-title" style="margin-bottom: 0.5rem;" data-i18n="tagger_title">MP3 Auto Tagger</h2>
+                    <div>
+                        <span id="cost-link" style="font-size: 0.85rem; color: var(--primary); font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 0.25rem; text-decoration: underline;">
+                            <i class="fas fa-circle-info"></i> <span data-i18n="cost_link">API 비용 알아보기</span>
+                        </span>
+                    </div>
+                </div>
+                
+                <div id="drop-zone">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <p style="font-size: 1.1rem; font-weight: 500; margin-bottom: 0.5rem; color: var(--foreground);" data-i18n="drop_zone_text">MP3 파일을 여기에 드래그하거나 클릭하세요</p>
+                    <span style="font-size: 0.85rem; color: var(--muted-foreground);" data-i18n="drop_zone_sub">최대 50MB, .mp3 형식 지원</span>
+                </div>
+                <input type="file" id="file-input" multiple accept=".mp3" style="display: none;">
+
+                <div id="file-table-container" style="display: none;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th data-i18n="th_art">Art</th>
+                                <th data-i18n="th_filename">파일명</th>
+                                <th data-i18n="th_artist">아티스트</th>
+                                <th data-i18n="th_title">제목</th>
+                                <th style="text-align: center;" data-i18n="th_lyrics">가사</th>
+                                <th data-i18n="th_clean_name">정리된 파일명</th>
+                                <th data-i18n="th_manage">관리</th>
+                            </tr>
+                        </thead>
+                        <tbody id="file-list"></tbody>
+                    </table>
+
+                    <div class="actions" style="flex-wrap: wrap; justify-content: center;">
+                        <button id="ai-magic-btn" class="btn btn-ai">
+                            <i class="fas fa-magic"></i> <span data-i18n="btn_ai_magic">AI Magic Fill</span>
+                        </button>
+                        <button id="fetch-lyrics-all-btn" class="btn btn-secondary">
+                            <i class="fas fa-file-audio"></i> <span data-i18n="btn_fetch_lyrics_all">가사 전체 검색</span>
+                        </button>
+                        <button id="fetch-art-all-btn" class="btn btn-secondary">
+                            <i class="fas fa-image"></i> <span data-i18n="btn_fetch_art_all">아트 전체 검색</span>
+                        </button>
+                        <button id="start-btn" class="btn btn-primary" disabled>
+                            <i class="fas fa-download"></i> <span data-i18n="btn_apply_download">Apply Tags & Download (.zip)</span>
+                        </button>
+                    </div>
+
+                    <!-- Pagination Controls -->
+                    <div id="pagination-container" style="display: flex; justify-content: center; align-items: center; gap: 1rem; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border);">
+                        <button id="prev-page" class="btn btn-secondary" style="padding: 0.4rem 0.8rem;"><i class="fas fa-chevron-left"></i></button>
+                        <span id="page-info" style="font-size: 0.9rem; font-weight: 600; color: var(--muted-foreground);">
+                            Page <span id="current-page-num">1</span> / <span id="total-pages-num">1</span>
+                        </span>
+                        <button id="next-page" class="btn btn-secondary" style="padding: 0.4rem 0.8rem;"><i class="fas fa-chevron-right"></i></button>
+                    </div>
+                </div>
+                <div id="status-msg" class="status" style="display: none;"></div>
+
+                <!-- AI Activity Log -->
+                <div id="ai-log-container" class="log-container">
+                    <div class="log-header">
+                        <span class="log-title" data-i18n="log_title">Activity Log</span>
+                    </div>
+                    <div id="log-window" class="log-window">
+                        <!-- Log entries will be added here -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Cutter Page (Placeholder) -->
+        <section id="page-cutter" class="page">
+            <div class="card">
+                <h2 class="card-title" data-i18n="cutter_title">MP3 Cutter</h2>
+                <p class="card-description" data-i18n="cutter_desc">오디오 파일의 원하는 구간을 정밀하게 자릅니다.</p>
+                <div class="placeholder-content">
+                    <i class="fas fa-cut" style="font-size: 3.5rem; color: var(--primary); margin-bottom: 1.5rem; display: block;"></i>
+                    <p style="font-size: 1.1rem; font-weight: 500; color: var(--foreground);" data-i18n="placeholder_ready">기능이 곧 추가됩니다!</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Merger Page (Placeholder) -->
+        <section id="page-merger" class="page">
+            <div class="card">
+                <h2 class="card-title" data-i18n="merger_title">MP3 Merger</h2>
+                <p class="card-description" data-i18n="merger_desc">여러 개의 오디오 파일을 하나로 합칩니다.</p>
+                <div class="placeholder-content">
+                    <i class="fas fa-object-group" style="font-size: 3.5rem; color: var(--primary); margin-bottom: 1.5rem; display: block;"></i>
+                    <p style="font-size: 1.1rem; font-weight: 500; color: var(--foreground);" data-i18n="placeholder_ready">기능이 곧 추가됩니다!</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Converter Page (Placeholder) -->
+        <section id="page-converter" class="page">
+            <div class="card">
+                <h2 class="card-title" data-i18n="converter_title">Audio Converter</h2>
+                <p class="card-description" data-i18n="converter_desc">다양한 오디오 포맷 간의 변환을 지원합니다.</p>
+                <div class="placeholder-content">
+                    <i class="fas fa-sync" style="font-size: 3.5rem; color: var(--primary); margin-bottom: 1.5rem; display: block;"></i>
+                    <p style="font-size: 1.1rem; font-weight: 500; color: var(--foreground);" data-i18n="placeholder_ready">기능이 곧 추가됩니다!</p>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- API Cost Modal -->
+    <div id="cost-modal" class="modal-backdrop">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 style="margin:0" data-i18n="modal_cost_title">💰 AI 사용 예상 비용 안내</h3>
+                <button id="cost-modal-close" class="modal-close"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <ul class="cost-list">
+                    <li class="cost-item">
+                        <i class="fas fa-microchip"></i>
+                        <div>
+                            <strong data-i18n="cost_item1_title">gpt-4o-mini 모델 기준</strong>
+                            <p style="margin: 0.25rem 0; color: var(--muted-foreground); font-size: 0.85rem;" data-i18n="cost_item1_desc">현재 가장 경제적인 모델을 사용합니다.</p>
+                        </div>
+                    </li>
+                    <li class="cost-item">
+                        <i class="fas fa-coins"></i>
+                        <div>
+                            <strong data-i18n="cost_item2_title">1곡당 약 0.04원</strong>
+                            <p style="margin: 0.25rem 0; color: var(--muted-foreground); font-size: 0.85rem;" data-i18n="cost_item2_desc">곡당 평균 100 토큰 내외로 소모됩니다. (1,000곡 작업 시 단돈 40원!)</p>
+                        </div>
+                    </li>
+                    <li class="cost-item">
+                        <i class="fas fa-hand-holding-dollar"></i>
+                        <div>
+                            <strong data-i18n="cost_item3_title">직접 수정 시 0원</strong>
+                            <p style="margin: 0.25rem 0; color: var(--muted-foreground); font-size: 0.85rem;" data-i18n="cost_item3_desc">AI 기능을 사용하지 않고 텍스트를 직접 입력하면 비용이 발생하지 않습니다.</p>
+                        </div>
+                    </li>
+                </ul>
+                <div style="margin-top: 1.5rem; padding: 1rem; background: var(--muted); border-radius: var(--radius); font-size: 0.8rem; color: var(--muted-foreground);" data-i18n="modal_cost_footer">
+                    ※ 이 정보는 gpt-4o-mini의 표준 API 단가 및 이 도구의 시스템 프롬프트를 기준으로 계산된 추정치입니다. 실제 비용은 곡 제목의 길이에 따라 소폭 다를 수 있습니다.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Settings Modal -->
+    <div id="ai-settings-modal" class="modal-backdrop">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 style="margin:0" data-i18n="modal_ai_title">🤖 AI 분석 설정</h3>
+                <button id="ai-settings-close" class="modal-close"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="config-group" style="margin-bottom: 1.5rem;">
+                    <label data-i18n="label_model">AI Model</label>
+                    <select id="ai-model-combined">
+                        <optgroup label="OpenAI" data-i18n="optgroup_openai">
+                            <option value="openai:gpt-4o-mini" data-i18n="opt_gpt4o_mini">gpt-4o-mini (가장 추천)</option>
+                            <option value="openai:gpt-4o" data-i18n="opt_gpt4o_high">gpt-4o (고성능)</option>
+                        </optgroup>
+                        <optgroup label="Google Gemini" data-i18n="optgroup_gemini">
+                            <option value="gemini:gemini-2.0-flash" data-i18n="opt_gemini_2_flash">gemini-2.0-flash (최신/추천)</option>
+                            <option value="gemini:gemini-1.5-flash" data-i18n="opt_gemini_1_5_flash">gemini-1.5-flash (안정적)</option>
+                            <option value="gemini:gemini-1.5-pro" data-i18n="opt_gemini_1_5_pro">gemini-1.5-pro (고성능)</option>
+                        </optgroup>
+                    </select>
+                </div>
+                <div class="config-group" style="margin-bottom: 1rem;">
+                    <label data-i18n="label_api_key">API Key</label>
+                    <input type="password" id="ai-api-key" placeholder="Enter your secret key" data-i18n-placeholder="placeholder_api_key">
+                    <div style="margin-top: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                        <input type="checkbox" id="remember-key" style="width: auto;">
+                        <label for="remember-key" style="font-size: 0.8rem; text-transform: none; font-weight: normal; cursor: pointer;" data-i18n="label_remember_key">이 브라우저에서 기억하기</label>
+                    </div>
+                </div>
+                <p style="font-size: 0.8rem; color: var(--muted-foreground); margin-bottom: 1.5rem;" data-i18n="ai_modal_hint">
+                    ※ API 키는 브라우저에 안전하게 저장되며, 분석 버튼을 누르면 시작됩니다.
+                </p>
+                <button id="run-ai-btn" class="btn btn-ai" style="width: 100%; justify-content: center;">
+                    <i class="fas fa-play"></i> <span data-i18n="btn_run_ai">분석 시작</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Album Art Search Modal -->
+    <div id="art-search-modal" class="modal-backdrop">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 style="margin:0" data-i18n="modal_art_search_title">🖼️ 앨범 아트 검색</h3>
+                <button id="art-search-close" class="modal-close"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="config-group" style="margin-bottom: 1.5rem;">
+                    <label data-i18n="label_search_term">검색어 (아티스트 + 제목)</label>
+                    <input type="text" id="art-search-input" placeholder="Artist and song title..." data-i18n-placeholder="placeholder_art_search">
+                </div>
+                <button id="modal-art-search-btn" class="btn btn-primary" style="width: 100%; justify-content: center;">
+                    <i class="fas fa-search"></i> <span data-i18n="btn_search">검색 실행</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
