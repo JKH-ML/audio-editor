@@ -480,7 +480,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         for (let i = 0; i < uploadedFiles.length; i++) {
             const item = uploadedFiles[i];
-            await fetchLyricsForItem(item, true);
+            await fetchLyricsForItem(item, false);
             if (i % 5 === 0) logMessage(`Processing lyrics: ${i + 1}/${uploadedFiles.length}...`, 'info');
         }
         
@@ -498,7 +498,7 @@ document.addEventListener('DOMContentLoaded', () => {
         for (let i = 0; i < uploadedFiles.length; i++) {
             const item = uploadedFiles[i];
             const searchTerm = `${item.artist.trim()} ${item.title.trim()}`;
-            await performArtSearch(item, searchTerm, true);
+            await performArtSearch(item, searchTerm, false);
             if (i % 5 === 0) logMessage(`Processing art: ${i + 1}/${uploadedFiles.length}...`, 'info');
         }
         
