@@ -354,13 +354,18 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!artist || !title) return;
 
         // Build candidates in order:
-        // 1. 한글 원본 artist + title (lrclib에 한글로 등록된 경우)
-        // 2. AI search_query의 첫 단어를 artist, 나머지를 title로 (영문 아티스트명으로 등록된 경우 - 예: IU, BTS)
-        // 3. 원본을 q= 로 통검색
+        // 1. 한글 원본 artist + title
+        // 2. 영문 아티스트명(search_query 첫 단어) + 한글 title (예: IU + 사랑이 잘)
+        // 3. 영문 아티스트명 + 영문 title (search_query 전체 분리)
+        // 4. search_query 통검색
         const candidates = [
             { artist_name: artist, track_name: title }
         ];
         if (item.searchQuery) {
+            const engArtist = item.searchQuery.trim().split(/\s+/)[0];
+            if (engArtist && engArtist.toLowerCase() !== artist.toLowerCase()) {
+                candidates.push({ artist_name: engArtist, track_name: title });
+            }
             const parts = item.searchQuery.trim().split(/\s+/);
             if (parts.length >= 2) {
                 candidates.push({ artist_name: parts[0], track_name: parts.slice(1).join(' ') });
@@ -418,7 +423,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!searchTerm) return;
 
         const queries = [searchTerm];
-        if (item.searchQuery && item.searchQuery !== searchTerm) queries.push(item.searchQuery);
+        // 영문 아티스트 + 한글 제목 조합 추가 (예: "IU 사랑이 잘 (With 오혁)")
+        if (item.searchQuery) {
+            const engArtist = item.searchQuery.trim().split(/\s+/)[0];
+            const korTitle = item.title?.trim();
+            if (engArtist && korTitle && engArtist.toLowerCase() !== item.artist?.toLowerCase()) {
+                const mixedQuery = `${engArtist} ${korTitle}`;
+                if (!queries.includes(mixedQuery)) queries.push(mixedQuery);
+            }
+            if (item.searchQuery !== searchTerm) queries.push(item.searchQuery);
+        }
 
         for (const query of queries) {
             // 1. Try iTunes (via proxy)
