@@ -349,14 +349,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const title = item.title.trim();
         if (!artist || !title) return;
 
-        // Build search candidates: AI search_query first, then original artist/title
-        const candidates = [];
+        // Build candidates in order:
+        // 1. 한글 원본 artist + title (lrclib에 한글로 등록된 경우)
+        // 2. AI search_query의 첫 단어를 artist, 나머지를 title로 (영문 아티스트명으로 등록된 경우 - 예: IU, BTS)
+        // 3. 원본을 q= 로 통검색
+        const candidates = [
+            { artist_name: artist, track_name: title }
+        ];
         if (item.searchQuery) {
             const parts = item.searchQuery.trim().split(/\s+/);
-            // Use search_query split as artist+title hint, or search as q param
+            if (parts.length >= 2) {
+                candidates.push({ artist_name: parts[0], track_name: parts.slice(1).join(' ') });
+            }
             candidates.push({ q: item.searchQuery });
         }
-        candidates.push({ artist_name: artist, track_name: title });
 
         for (const params of candidates) {
             try {
@@ -397,7 +403,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const performArtSearch = async (item, searchTerm, silent = false) => {
         if (!searchTerm) return;
 
-        // Query order: original searchTerm first (Korean works on Deezer), then AI search_query as fallback
+        // Query order:
+        // 1. 한글 원본 (Deezer는 한글 검색 잘 됨)
+        // 2. AI search_query 영문 (iTunes는 영문 검색 잘 됨, 한글 아티스트명 영문화 - 예: 아이유→IU)
         const queries = [searchTerm];
         if (item.searchQuery && item.searchQuery !== searchTerm) queries.push(item.searchQuery);
 
@@ -444,7 +452,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        if (!silent) logMessage(`[Art] No results found for: ${primaryQuery}`, 'error');
+        if (!silent) logMessage(`[Art] No results found for: ${searchTerm}`, 'error');
         return false;
     };
 
