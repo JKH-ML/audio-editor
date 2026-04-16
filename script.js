@@ -397,9 +397,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const performArtSearch = async (item, searchTerm, silent = false) => {
         if (!searchTerm) return;
 
-        // Use AI-generated search_query if available, fall back to provided searchTerm
-        const primaryQuery = item.searchQuery || searchTerm;
-        const queries = primaryQuery === searchTerm ? [searchTerm] : [primaryQuery, searchTerm];
+        // Query order: original searchTerm first (Korean works on Deezer), then AI search_query as fallback
+        const queries = [searchTerm];
+        if (item.searchQuery && item.searchQuery !== searchTerm) queries.push(item.searchQuery);
 
         for (const query of queries) {
             // 1. Try iTunes
@@ -552,11 +552,12 @@ CRITICAL RULES:
    - Example: "[1theK] IU (아이유) _ LILAC" -> Artist is "IU", NOT "1theK".
 3. CLEAN TITLE: Extract only the song title. Remove promotional noise like "(Color Coded Lyrics)", "Official MV", "Music Video", "1080p", etc.
 4. VERSIONING: Keep essential info like "(Remix)", "(Acoustic)", or "(Feat. Artist)" in the title or artist field appropriately.
-5. LANGUAGE: If a name is in both English and another language, prefer the English name or the most recognizable one.
-6. SEARCH QUERY: Provide a "search_query" field with the best English search term for finding this song's album art and lyrics on music APIs (Deezer, iTunes, lrclib). Use the most internationally recognized English artist name and song title. If the song is Korean, romanize or use the known English name.
-   - Example: 자이언티 - 양화대교 -> search_query: "Zion.T Yanghwa BRDG"
-   - Example: IU (아이유) - LILAC -> search_query: "IU LILAC"
-   - Example: BTS - 봄날 -> search_query: "BTS Spring Day"
+5. LANGUAGE: For "artist" and "title" fields, keep the original language (Korean stays Korean, English stays English). Do NOT romanize or translate.
+6. SEARCH QUERY: Provide a "search_query" field ONLY for use with music APIs (Deezer, iTunes, lrclib). This should be in English/romanized for best API results. Use the internationally known English name if it exists, otherwise romanize.
+   - Example: 버즈 - 나에게로 떠나는 여행 -> artist: "버즈", title: "나에게로 떠나는 여행", search_query: "Buzz Na Ege Ro Tteonaneun Yeohaeng"
+   - Example: 자이언티 - 양화대교 -> artist: "자이언티", title: "양화대교", search_query: "Zion.T Yanghwa BRDG"
+   - Example: IU (아이유) - LILAC -> artist: "IU", title: "LILAC", search_query: "IU LILAC"
+   - Example: BTS - 봄날 -> artist: "BTS", title: "봄날", search_query: "BTS Spring Day"
 
 JSON FORMAT: Return only {"results": [{"artist": "...", "title": "...", "search_query": "..."}, ...]}`;
 
