@@ -422,16 +422,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const performArtSearch = async (item, searchTerm, silent = false) => {
         if (!searchTerm) return;
 
+        // 괄호 내용 제거 헬퍼 (With 오혁), (feat. xxx) 등 제거
+        const stripParens = (s) => s.replace(/\s*\(.*?\)/g, '').trim();
+
+        const addQuery = (q, arr) => { if (q && !arr.includes(q)) arr.push(q); };
+
         const queries = [searchTerm];
-        // 영문 아티스트 + 한글 제목 조합 추가 (예: "IU 사랑이 잘 (With 오혁)")
+        addQuery(stripParens(searchTerm), queries); // 괄호 제거 버전
+
         if (item.searchQuery) {
             const engArtist = item.searchQuery.trim().split(/\s+/)[0];
             const korTitle = item.title?.trim();
             if (engArtist && korTitle && engArtist.toLowerCase() !== item.artist?.toLowerCase()) {
-                const mixedQuery = `${engArtist} ${korTitle}`;
-                if (!queries.includes(mixedQuery)) queries.push(mixedQuery);
+                addQuery(`${engArtist} ${korTitle}`, queries);           // IU 사랑이 잘 (With 오혁)
+                addQuery(`${engArtist} ${stripParens(korTitle)}`, queries); // IU 사랑이 잘
             }
-            if (item.searchQuery !== searchTerm) queries.push(item.searchQuery);
+            addQuery(item.searchQuery, queries);
+            addQuery(stripParens(item.searchQuery), queries);
         }
 
         for (const query of queries) {
