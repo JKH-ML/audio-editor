@@ -349,55 +349,102 @@ document.addEventListener('DOMContentLoaded', () => {
         const title = item.title.trim();
         if (!artist || !title) return;
 
-        try {
-            const url = `https://lrclib.net/api/search?artist_name=${encodeURIComponent(artist)}&track_name=${encodeURIComponent(title)}`;
-            const response = await fetch(url);
-            if (response.ok) {
-                const results = await response.json();
-                if (Array.isArray(results) && results.length > 0) {
-                    const data = results[0];
-                    const foundLyrics = data.syncedLyrics || data.plainLyrics;
-                    if (foundLyrics) {
-                        item.lyrics = foundLyrics;
-                        if (!silent) logMessage(`[Lyrics] Found: ${artist} - ${title}`, 'success');
-                        if (item.updateRowUI) item.updateRowUI();
-                        return true;
+        // Build search candidates: AI search_query first, then original artist/title
+        const candidates = [];
+        if (item.searchQuery) {
+            const parts = item.searchQuery.trim().split(/\s+/);
+            // Use search_query split as artist+title hint, or search as q param
+            candidates.push({ q: item.searchQuery });
+        }
+        candidates.push({ artist_name: artist, track_name: title });
+
+        for (const params of candidates) {
+            try {
+                const queryStr = params.q
+                    ? `q=${encodeURIComponent(params.q)}`
+                    : `artist_name=${encodeURIComponent(params.artist_name)}&track_name=${encodeURIComponent(params.track_name)}`;
+                const url = `https://lrclib.net/api/search?${queryStr}`;
+                const response = await fetch(url);
+                if (response.ok) {
+                    const results = await response.json();
+                    if (Array.isArray(results) && results.length > 0) {
+                        const data = results[0];
+                        const foundLyrics = data.syncedLyrics || data.plainLyrics;
+                        if (foundLyrics) {
+                            item.lyrics = foundLyrics;
+                            if (!silent) logMessage(`[Lyrics] Found: ${artist} - ${title}`, 'success');
+                            if (item.updateRowUI) item.updateRowUI();
+                            return true;
+                        }
                     }
                 }
+            } catch (err) {
+                // try next candidate
             }
-            if (!silent) logMessage(`[Lyrics] No lyrics found for: ${artist} - ${title}`, 'error');
-        } catch (err) {
-            if (!silent) logMessage(`[Lyrics] Search failed: ${err.message}`, 'error');
         }
+
+        if (!silent) logMessage(`[Lyrics] No lyrics found for: ${artist} - ${title}`, 'error');
         return false;
+    };
+
+    const fetchArtFromUrl = async (artUrl) => {
+        const imgRes = await fetch(artUrl);
+        if (!imgRes.ok) throw new Error(`Failed to fetch image: ${imgRes.status}`);
+        const blob = await imgRes.blob();
+        return await blob.arrayBuffer();
     };
 
     const performArtSearch = async (item, searchTerm, silent = false) => {
         if (!searchTerm) return;
 
-        try {
-            const url = `https://itunes.apple.com/search?term=${encodeURIComponent(searchTerm)}&entity=song&limit=1`;
-            const response = await fetch(url);
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-            
-            const data = await response.json();
-            if (data.results && data.results.length > 0) {
-                let artUrl = data.results[0].artworkUrl100;
-                if (artUrl) {
-                    artUrl = artUrl.replace('100x100bb', '600x600bb');
-                    const imgRes = await fetch(artUrl);
-                    if (!imgRes.ok) throw new Error(`Failed to fetch image: ${imgRes.status}`);
-                    const blob = await imgRes.blob();
-                    item.artBuffer = await blob.arrayBuffer();
-                    if (!silent) logMessage(`[Art] Found art for: ${searchTerm}`, 'success');
-                    if (item.updateRowUI) item.updateRowUI();
-                    return true;
+        // Use AI-generated search_query if available, fall back to provided searchTerm
+        const primaryQuery = item.searchQuery || searchTerm;
+        const queries = primaryQuery === searchTerm ? [searchTerm] : [primaryQuery, searchTerm];
+
+        for (const query of queries) {
+            // 1. Try iTunes
+            try {
+                const url = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&entity=song&limit=1`;
+                const response = await fetch(url);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.results && data.results.length > 0) {
+                        let artUrl = data.results[0].artworkUrl100;
+                        if (artUrl) {
+                            artUrl = artUrl.replace('100x100bb', '600x600bb');
+                            item.artBuffer = await fetchArtFromUrl(artUrl);
+                            if (!silent) logMessage(`[Art] Found via iTunes for: ${query}`, 'success');
+                            if (item.updateRowUI) item.updateRowUI();
+                            return true;
+                        }
+                    }
                 }
+            } catch (err) {
+                // iTunes failed, try Deezer
             }
-            if (!silent) logMessage(`[Art] No results found for: ${searchTerm}`, 'error');
-        } catch (err) {
-            if (!silent) logMessage(`[Art] Search failed for "${searchTerm}": ${err.message}`, 'error');
+
+            // 2. Try Deezer
+            try {
+                const url = `https://api.deezer.com/search?q=${encodeURIComponent(query)}&limit=1`;
+                const response = await fetch(url);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.data && data.data.length > 0) {
+                        const artUrl = data.data[0].album?.cover_big;
+                        if (artUrl) {
+                            item.artBuffer = await fetchArtFromUrl(artUrl);
+                            if (!silent) logMessage(`[Art] Found via Deezer for: ${query}`, 'success');
+                            if (item.updateRowUI) item.updateRowUI();
+                            return true;
+                        }
+                    }
+                }
+            } catch (err) {
+                // Deezer failed too
+            }
         }
+
+        if (!silent) logMessage(`[Art] No results found for: ${primaryQuery}`, 'error');
         return false;
     };
 
@@ -500,14 +547,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
 CRITICAL RULES:
 1. UPLOADER REJECTION: Text in brackets at the VERY START of the filename (e.g., [Jaeguchi], [1theK], [HYBE], [SMTOWN], [Stone Music]) is almost always a YouTube channel or distributor. NEVER use this as the artist.
-2. IDENTIFY REAL ARTIST: Look for the name that follows the distributor tag. 
+2. IDENTIFY REAL ARTIST: Look for the name that follows the distributor tag.
    - Example: "[Jaeguchi] KiiiKiii - Song" -> Artist is "KiiiKiii", NOT "Jaeguchi".
    - Example: "[1theK] IU (아이유) _ LILAC" -> Artist is "IU", NOT "1theK".
 3. CLEAN TITLE: Extract only the song title. Remove promotional noise like "(Color Coded Lyrics)", "Official MV", "Music Video", "1080p", etc.
 4. VERSIONING: Keep essential info like "(Remix)", "(Acoustic)", or "(Feat. Artist)" in the title or artist field appropriately.
 5. LANGUAGE: If a name is in both English and another language, prefer the English name or the most recognizable one.
+6. SEARCH QUERY: Provide a "search_query" field with the best English search term for finding this song's album art and lyrics on music APIs (Deezer, iTunes, lrclib). Use the most internationally recognized English artist name and song title. If the song is Korean, romanize or use the known English name.
+   - Example: 자이언티 - 양화대교 -> search_query: "Zion.T Yanghwa BRDG"
+   - Example: IU (아이유) - LILAC -> search_query: "IU LILAC"
+   - Example: BTS - 봄날 -> search_query: "BTS Spring Day"
 
-JSON FORMAT: Return only {"results": [{"artist": "...", "title": "..."}, ...]}`;
+JSON FORMAT: Return only {"results": [{"artist": "...", "title": "...", "search_query": "..."}, ...]}`;
 
     const aiLogContainer = document.getElementById('ai-log-container');
     const logWindow = document.getElementById('log-window');
@@ -547,12 +598,13 @@ JSON FORMAT: Return only {"results": [{"artist": "...", "title": "..."}, ...]}`;
                 const results = data.results;
 
                 if (Array.isArray(results)) {
-                    // 1. Update ONLY artist and title properties
+                    // 1. Update artist, title, and search_query properties
                     results.forEach((res, index) => {
                         const item = chunk[index];
                         if (item && res) {
                             item.artist = res.artist || "Unknown";
                             item.title = res.title || "Unknown";
+                            if (res.search_query) item.searchQuery = res.search_query;
                         }
                     });
                     
