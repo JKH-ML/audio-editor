@@ -403,6 +403,10 @@ document.addEventListener('DOMContentLoaded', () => {
         return false;
     };
 
+    const CORS_PROXY = 'https://music-cors-proxy.banghak2da.workers.dev/?url=';
+
+    const proxyFetch = (url) => fetch(CORS_PROXY + encodeURIComponent(url));
+
     const fetchArtFromUrl = async (artUrl) => {
         const imgRes = await fetch(artUrl);
         if (!imgRes.ok) throw new Error(`Failed to fetch image: ${imgRes.status}`);
@@ -413,18 +417,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const performArtSearch = async (item, searchTerm, silent = false) => {
         if (!searchTerm) return;
 
-        // Query order:
-        // 1. 한글 원본 (Deezer는 한글 검색 잘 됨)
-        // 2. AI search_query 영문 (iTunes는 영문 검색 잘 됨, 한글 아티스트명 영문화 - 예: 아이유→IU)
         const queries = [searchTerm];
         if (item.searchQuery && item.searchQuery !== searchTerm) queries.push(item.searchQuery);
 
         for (const query of queries) {
-            // 1. Try iTunes
+            // 1. Try iTunes (via proxy)
             try {
                 if (!silent) logMessage(`[Art] 시도: iTunes "${query}"`, 'info');
-                const url = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&entity=song&limit=1`;
-                const response = await fetch(url);
+                const url = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&entity=song&limit=1&country=kr`;
+                const response = await proxyFetch(url);
                 if (response.ok) {
                     const data = await response.json();
                     if (data.results && data.results.length > 0) {
@@ -444,11 +445,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!silent) logMessage(`[Art] iTunes 오류: "${query}" → ${err.message}`, 'error');
             }
 
-            // 2. Try Deezer
+            // 2. Try Deezer (via proxy)
             try {
                 if (!silent) logMessage(`[Art] 시도: Deezer "${query}"`, 'info');
                 const url = `https://api.deezer.com/search?q=${encodeURIComponent(query)}&limit=1`;
-                const response = await fetch(url);
+                const response = await proxyFetch(url);
                 if (response.ok) {
                     const data = await response.json();
                     if (data.data && data.data.length > 0) {
