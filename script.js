@@ -17,6 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
             th_filename: "파일명",
             th_artist: "아티스트",
             th_title: "제목",
+            th_search_query: "검색어",
             th_lyrics: "가사",
             th_clean_name: "정리된 파일명",
             th_manage: "관리",
@@ -68,6 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
             th_filename: "Filename",
             th_artist: "Artist",
             th_title: "Title",
+            th_search_query: "Search Query",
             th_lyrics: "Lyrics",
             th_clean_name: "Clean Filename",
             th_manage: "Manage",
@@ -118,6 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
             th_filename: "文件名",
             th_artist: "艺术家",
             th_title: "标题",
+            th_search_query: "搜索词",
             th_lyrics: "歌词",
             th_clean_name: "整理后的文件名",
             th_manage: "管理",
@@ -175,6 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
             th_filename: "ファイル名",
             th_artist: "アーティスト",
             th_title: "タイトル",
+            th_search_query: "検索クエリ",
             th_lyrics: "歌詞",
             th_clean_name: "整理されたファイル名",
             th_manage: "管理",
@@ -365,11 +369,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         for (const params of candidates) {
+            const queryDesc = params.q ? `q="${params.q}"` : `artist="${params.artist_name}" title="${params.track_name}"`;
             try {
                 const queryStr = params.q
                     ? `q=${encodeURIComponent(params.q)}`
                     : `artist_name=${encodeURIComponent(params.artist_name)}&track_name=${encodeURIComponent(params.track_name)}`;
                 const url = `https://lrclib.net/api/search?${queryStr}`;
+                if (!silent) logMessage(`[Lyrics] 시도: lrclib ${queryDesc}`, 'info');
                 const response = await fetch(url);
                 if (response.ok) {
                     const results = await response.json();
@@ -378,18 +384,22 @@ document.addEventListener('DOMContentLoaded', () => {
                         const foundLyrics = data.syncedLyrics || data.plainLyrics;
                         if (foundLyrics) {
                             item.lyrics = foundLyrics;
-                            if (!silent) logMessage(`[Lyrics] Found: ${artist} - ${title}`, 'success');
+                            if (!silent) logMessage(`[Lyrics] 성공: "${data.artistName} - ${data.trackName}"`, 'success');
                             if (item.updateRowUI) item.updateRowUI();
                             return true;
+                        } else {
+                            if (!silent) logMessage(`[Lyrics] 결과 있으나 가사 없음: ${queryDesc}`, 'error');
                         }
+                    } else {
+                        if (!silent) logMessage(`[Lyrics] 결과 없음: ${queryDesc}`, 'error');
                     }
                 }
             } catch (err) {
-                // try next candidate
+                if (!silent) logMessage(`[Lyrics] 오류: ${queryDesc} → ${err.message}`, 'error');
             }
         }
 
-        if (!silent) logMessage(`[Lyrics] No lyrics found for: ${artist} - ${title}`, 'error');
+        if (!silent) logMessage(`[Lyrics] 최종 실패: ${artist} - ${title}`, 'error');
         return false;
     };
 
@@ -412,6 +422,7 @@ document.addEventListener('DOMContentLoaded', () => {
         for (const query of queries) {
             // 1. Try iTunes
             try {
+                if (!silent) logMessage(`[Art] 시도: iTunes "${query}"`, 'info');
                 const url = `https://itunes.apple.com/search?term=${encodeURIComponent(query)}&entity=song&limit=1`;
                 const response = await fetch(url);
                 if (response.ok) {
@@ -421,18 +432,21 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (artUrl) {
                             artUrl = artUrl.replace('100x100bb', '600x600bb');
                             item.artBuffer = await fetchArtFromUrl(artUrl);
-                            if (!silent) logMessage(`[Art] Found via iTunes for: ${query}`, 'success');
+                            if (!silent) logMessage(`[Art] 성공 (iTunes): "${data.results[0].artistName} - ${data.results[0].trackName}"`, 'success');
                             if (item.updateRowUI) item.updateRowUI();
                             return true;
                         }
+                    } else {
+                        if (!silent) logMessage(`[Art] iTunes 결과 없음: "${query}"`, 'error');
                     }
                 }
             } catch (err) {
-                // iTunes failed, try Deezer
+                if (!silent) logMessage(`[Art] iTunes 오류: "${query}" → ${err.message}`, 'error');
             }
 
             // 2. Try Deezer
             try {
+                if (!silent) logMessage(`[Art] 시도: Deezer "${query}"`, 'info');
                 const url = `https://api.deezer.com/search?q=${encodeURIComponent(query)}&limit=1`;
                 const response = await fetch(url);
                 if (response.ok) {
@@ -441,18 +455,20 @@ document.addEventListener('DOMContentLoaded', () => {
                         const artUrl = data.data[0].album?.cover_big;
                         if (artUrl) {
                             item.artBuffer = await fetchArtFromUrl(artUrl);
-                            if (!silent) logMessage(`[Art] Found via Deezer for: ${query}`, 'success');
+                            if (!silent) logMessage(`[Art] 성공 (Deezer): "${data.data[0].artist.name} - ${data.data[0].title}"`, 'success');
                             if (item.updateRowUI) item.updateRowUI();
                             return true;
                         }
+                    } else {
+                        if (!silent) logMessage(`[Art] Deezer 결과 없음: "${query}"`, 'error');
                     }
                 }
             } catch (err) {
-                // Deezer failed too
+                if (!silent) logMessage(`[Art] Deezer 오류: "${query}" → ${err.message}`, 'error');
             }
         }
 
-        if (!silent) logMessage(`[Art] No results found for: ${searchTerm}`, 'error');
+        if (!silent) logMessage(`[Art] 최종 실패: ${searchTerm}`, 'error');
         return false;
     };
 
@@ -882,6 +898,7 @@ JSON FORMAT: Return only {"results": [{"artist": "...", "title": "...", "search_
             <td title="${item.file.name}">${item.file.name.substring(0, 20)}${item.file.name.length > 20 ? '...' : ''}</td>
             <td><input type="text" class="artist-input" value="${item.artist}"></td>
             <td><input type="text" class="title-input" value="${item.title}"></td>
+            <td><input type="text" class="search-query-input" value="${item.searchQuery || ''}" placeholder="AI 채우기 후 자동 생성" style="font-size: 0.75rem; color: var(--muted-foreground);"></td>
             <td style="text-align: center;">
                 <button class="btn-lyrics ${item.lyrics ? 'active' : ''}" title="가사 편집">
                     <i class="fas fa-file-alt"></i>
@@ -906,7 +923,7 @@ JSON FORMAT: Return only {"results": [{"artist": "...", "title": "...", "search_
         lyricsRow.className = 'lyrics-editor-row';
         lyricsRow.style.display = 'none';
         lyricsRow.innerHTML = `
-            <td colspan="7">
+            <td colspan="8">
                 <div class="lyrics-editor-container" style="display: block; padding: 1rem;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
                         <span style="font-size: 0.85rem; font-weight: 600; color: var(--muted-foreground);">가사 편집</span>
@@ -924,6 +941,7 @@ JSON FORMAT: Return only {"results": [{"artist": "...", "title": "...", "search_
         const artInput = row.querySelector('.art-input');
         const artistInput = row.querySelector('.artist-input');
         const titleInput = row.querySelector('.title-input');
+        const searchQueryInput = row.querySelector('.search-query-input');
         const lyricsBtn = row.querySelector('.btn-lyrics');
         const newNameCell = row.querySelector('.new-filename-cell');
         const removeBtn = row.querySelector('.btn-remove');
@@ -995,6 +1013,9 @@ JSON FORMAT: Return only {"results": [{"artist": "...", "title": "...", "search_
 
         artistInput.addEventListener('input', updatePreview);
         titleInput.addEventListener('input', updatePreview);
+        searchQueryInput.addEventListener('input', () => {
+            item.searchQuery = searchQueryInput.value.trim() || undefined;
+        });
 
         // For AI Magic to trigger searches
         item.performLyricsSearch = performLyricsSearch;
@@ -1002,8 +1023,9 @@ JSON FORMAT: Return only {"results": [{"artist": "...", "title": "...", "search_
         item.updateRowUI = () => {
             artistInput.value = item.artist;
             titleInput.value = item.title;
+            searchQueryInput.value = item.searchQuery || '';
             lyricsTextarea.value = item.lyrics;
-            
+
             if (item.artBuffer) {
                 const blob = new Blob([item.artBuffer]);
                 const url = URL.createObjectURL(blob);

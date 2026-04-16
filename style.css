@@ -450,6 +450,13 @@ input[type="text"]:focus {
 .log-msg-error { color: var(--destructive); }
 .log-msg-ai { color: #a855f7; font-style: italic; }
 
+.search-query-input {
+    font-size: 0.72rem;
+    color: var(--muted-foreground);
+    min-width: 100px;
+    max-width: 160px;
+}
+
 /* Placeholder for other pages */
 .placeholder-content {
     text-align: center;
