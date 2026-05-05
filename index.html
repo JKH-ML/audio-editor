@@ -117,14 +117,102 @@
             </div>
         </section>
 
-        <!-- Cutter Page (Placeholder) -->
+        <!-- Cutter Page -->
         <section id="page-cutter" class="page">
             <div class="card">
                 <h2 class="card-title" data-i18n="cutter_title">MP3 Cutter</h2>
                 <p class="card-description" data-i18n="cutter_desc">오디오 파일의 원하는 구간을 정밀하게 자릅니다.</p>
-                <div class="placeholder-content">
-                    <i class="fas fa-cut" style="font-size: 3.5rem; color: var(--primary); margin-bottom: 1.5rem; display: block;"></i>
-                    <p style="font-size: 1.1rem; font-weight: 500; color: var(--foreground);" data-i18n="placeholder_ready">기능이 곧 추가됩니다!</p>
+
+                <!-- Drop Zone -->
+                <div id="cutter-drop-zone">
+                    <i class="fas fa-cut"></i>
+                    <p style="font-size: 1.1rem; font-weight: 500; margin-bottom: 0.5rem; color: var(--foreground);" data-i18n="cutter_drop_text">MP3 파일을 여기에 드래그하거나 클릭하세요</p>
+                    <span style="font-size: 0.85rem; color: var(--muted-foreground);" data-i18n="cutter_drop_sub">.mp3, .wav, .ogg 형식 지원</span>
+                </div>
+                <input type="file" id="cutter-file-input" accept="audio/*" style="display: none;">
+
+                <!-- Editor Area -->
+                <div id="cutter-editor" style="display: none;">
+                    <!-- File Info -->
+                    <div class="cutter-file-info">
+                        <i class="fas fa-file-audio" style="color: var(--primary);"></i>
+                        <span id="cutter-filename" style="font-weight: 600;"></span>
+                        <span id="cutter-duration" style="color: var(--muted-foreground); font-size: 0.85rem;"></span>
+                        <button id="cutter-reset-btn" class="btn btn-secondary" style="margin-left: auto; padding: 0.3rem 0.75rem; font-size: 0.8rem;">
+                            <i class="fas fa-times"></i> 파일 변경
+                        </button>
+                    </div>
+
+                    <!-- Waveform -->
+                    <div class="waveform-wrapper">
+                        <canvas id="waveform-canvas"></canvas>
+                        <div id="selection-overlay"></div>
+                        <div id="handle-start" class="waveform-handle handle-start">
+                            <div class="handle-line"></div>
+                            <div class="handle-label" id="handle-start-label">00:00</div>
+                        </div>
+                        <div id="handle-end" class="waveform-handle handle-end">
+                            <div class="handle-line"></div>
+                            <div class="handle-label" id="handle-end-label">00:00</div>
+                        </div>
+                        <div id="playhead" class="playhead"></div>
+                    </div>
+
+                    <!-- Time Controls -->
+                    <div class="cutter-controls">
+                        <div class="time-input-group">
+                            <label data-i18n="cutter_start">시작</label>
+                            <input type="text" id="start-time-input" class="time-input" placeholder="00:00.000">
+                        </div>
+                        <div class="cutter-center-controls">
+                            <button id="cutter-play-btn" class="btn btn-primary cutter-play-btn" title="재생/일시정지">
+                                <i class="fas fa-play"></i>
+                            </button>
+                            <button id="cutter-preview-btn" class="btn btn-secondary" title="선택 구간만 미리듣기">
+                                <i class="fas fa-headphones"></i> <span data-i18n="cutter_preview">구간 미리듣기</span>
+                            </button>
+                            <span id="cutter-current-time" style="font-size: 0.9rem; color: var(--muted-foreground); min-width: 60px; text-align: center;">00:00</span>
+                        </div>
+                        <div class="time-input-group" style="text-align: right;">
+                            <label data-i18n="cutter_end">종료</label>
+                            <input type="text" id="end-time-input" class="time-input" placeholder="00:00.000">
+                        </div>
+                    </div>
+
+                    <!-- Selection Info -->
+                    <div class="selection-info">
+                        <span><i class="fas fa-scissors" style="color: var(--primary);"></i> <span data-i18n="cutter_selection">선택 구간</span>: <strong id="selection-duration-display">00:00.000</strong></span>
+                    </div>
+
+                    <!-- Output Settings -->
+                    <div class="cutter-output-settings">
+                        <div class="config-group">
+                            <label data-i18n="cutter_output_name">출력 파일명</label>
+                            <input type="text" id="cutter-output-name" placeholder="output.mp3">
+                        </div>
+                        <div class="config-group">
+                            <label data-i18n="cutter_fade">페이드 효과</label>
+                            <select id="cutter-fade-select">
+                                <option value="none" data-i18n="cutter_fade_none">없음</option>
+                                <option value="in" data-i18n="cutter_fade_in">페이드 인</option>
+                                <option value="out" data-i18n="cutter_fade_out">페이드 아웃</option>
+                                <option value="both" data-i18n="cutter_fade_both">페이드 인/아웃</option>
+                            </select>
+                        </div>
+                        <div class="config-group">
+                            <label data-i18n="cutter_fade_duration">페이드 시간 (초)</label>
+                            <input type="number" id="cutter-fade-duration" value="1" min="0.1" max="10" step="0.1" style="width: 80px;">
+                        </div>
+                    </div>
+
+                    <!-- Download Button -->
+                    <div class="actions">
+                        <button id="cutter-download-btn" class="btn btn-primary">
+                            <i class="fas fa-download"></i> <span data-i18n="cutter_download">구간 잘라내기 & 다운로드</span>
+                        </button>
+                    </div>
+
+                    <div id="cutter-status" class="status" style="display: none;"></div>
                 </div>
             </div>
         </section>

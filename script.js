@@ -28,6 +28,20 @@ document.addEventListener('DOMContentLoaded', () => {
             log_title: "활동 로그",
             cutter_title: "MP3 Cutter",
             cutter_desc: "오디오 파일의 원하는 구간을 정밀하게 자릅니다.",
+            cutter_drop_text: "MP3 파일을 여기에 드래그하거나 클릭하세요",
+            cutter_drop_sub: ".mp3, .wav, .ogg 형식 지원",
+            cutter_start: "시작",
+            cutter_end: "종료",
+            cutter_preview: "구간 미리듣기",
+            cutter_selection: "선택 구간",
+            cutter_output_name: "출력 파일명",
+            cutter_fade: "페이드 효과",
+            cutter_fade_none: "없음",
+            cutter_fade_in: "페이드 인",
+            cutter_fade_out: "페이드 아웃",
+            cutter_fade_both: "페이드 인/아웃",
+            cutter_fade_duration: "페이드 시간 (초)",
+            cutter_download: "구간 잘라내기 & 다운로드",
             placeholder_ready: "기능이 곧 추가됩니다!",
             merger_title: "MP3 Merger",
             merger_desc: "여러 개의 오디오 파일을 하나로 합칩니다.",
@@ -80,6 +94,20 @@ document.addEventListener('DOMContentLoaded', () => {
             log_title: "Activity Log",
             cutter_title: "MP3 Cutter",
             cutter_desc: "Precisely cut sections of audio files.",
+            cutter_drop_text: "Drag and drop audio file here or click",
+            cutter_drop_sub: ".mp3, .wav, .ogg formats supported",
+            cutter_start: "Start",
+            cutter_end: "End",
+            cutter_preview: "Preview Selection",
+            cutter_selection: "Selected",
+            cutter_output_name: "Output Filename",
+            cutter_fade: "Fade Effect",
+            cutter_fade_none: "None",
+            cutter_fade_in: "Fade In",
+            cutter_fade_out: "Fade Out",
+            cutter_fade_both: "Fade In/Out",
+            cutter_fade_duration: "Fade Duration (s)",
+            cutter_download: "Cut & Download",
             placeholder_ready: "Coming soon!",
             merger_title: "MP3 Merger",
             merger_desc: "Merge multiple audio files into one.",
@@ -131,6 +159,20 @@ document.addEventListener('DOMContentLoaded', () => {
             log_title: "活动日志",
             cutter_title: "MP3 切割器",
             cutter_desc: "精确切割音频文件的所需部分。",
+            cutter_drop_text: "将音频文件拖放到此处或点击",
+            cutter_drop_sub: "支持 .mp3, .wav, .ogg 格式",
+            cutter_start: "开始",
+            cutter_end: "结束",
+            cutter_preview: "预览选段",
+            cutter_selection: "已选择",
+            cutter_output_name: "输出文件名",
+            cutter_fade: "淡入淡出效果",
+            cutter_fade_none: "无",
+            cutter_fade_in: "淡入",
+            cutter_fade_out: "淡出",
+            cutter_fade_both: "淡入/淡出",
+            cutter_fade_duration: "淡入淡出时长 (秒)",
+            cutter_download: "剪切并下载",
             placeholder_ready: "即将推出！",
             merger_title: "MP3 合并器",
             merger_desc: "将多个音频文件合并为一个。",
@@ -189,6 +231,20 @@ document.addEventListener('DOMContentLoaded', () => {
             log_title: "アクティビティログ",
             cutter_title: "MP3カッター",
             cutter_desc: "オーディオファイルの指定した区間を正確にカットします。",
+            cutter_drop_text: "オーディオファイルをここにドラッグまたはクリック",
+            cutter_drop_sub: ".mp3, .wav, .ogg 形式対応",
+            cutter_start: "開始",
+            cutter_end: "終了",
+            cutter_preview: "区間プレビュー",
+            cutter_selection: "選択区間",
+            cutter_output_name: "出力ファイル名",
+            cutter_fade: "フェード効果",
+            cutter_fade_none: "なし",
+            cutter_fade_in: "フェードイン",
+            cutter_fade_out: "フェードアウト",
+            cutter_fade_both: "フェードイン/アウト",
+            cutter_fade_duration: "フェード時間 (秒)",
+            cutter_download: "カット＆ダウンロード",
             placeholder_ready: "機能はまもなく追加されます！",
             merger_title: "MP3マージャー",
             merger_desc: "複数のオーディオファイルを1つに結合します。",
@@ -221,6 +277,17 @@ document.addEventListener('DOMContentLoaded', () => {
             analyzing: "分析中..."
         }
     };
+
+    // --- Tab Navigation ---
+    document.querySelectorAll('.nav-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            tab.classList.add('active');
+            const target = document.getElementById(tab.dataset.target);
+            if (target) target.classList.add('active');
+        });
+    });
 
     const langSelect = document.getElementById('lang-select');
 
@@ -1116,6 +1183,476 @@ JSON FORMAT: Return only {"results": [{"artist": "...", "title": "...", "search_
         }
         return 'image/jpeg';
     }
+
+    // ============================================================
+    // MP3 Cutter Logic
+    // ============================================================
+    (() => {
+        const cutterDropZone = document.getElementById('cutter-drop-zone');
+        const cutterFileInput = document.getElementById('cutter-file-input');
+        const cutterEditor = document.getElementById('cutter-editor');
+        const cutterFilename = document.getElementById('cutter-filename');
+        const cutterDuration = document.getElementById('cutter-duration');
+        const cutterResetBtn = document.getElementById('cutter-reset-btn');
+        const waveformCanvas = document.getElementById('waveform-canvas');
+        const selectionOverlay = document.getElementById('selection-overlay');
+        const handleStart = document.getElementById('handle-start');
+        const handleEnd = document.getElementById('handle-end');
+        const handleStartLabel = document.getElementById('handle-start-label');
+        const handleEndLabel = document.getElementById('handle-end-label');
+        const playhead = document.getElementById('playhead');
+        const startTimeInput = document.getElementById('start-time-input');
+        const endTimeInput = document.getElementById('end-time-input');
+        const cutterPlayBtn = document.getElementById('cutter-play-btn');
+        const cutterPreviewBtn = document.getElementById('cutter-preview-btn');
+        const cutterCurrentTime = document.getElementById('cutter-current-time');
+        const selectionDurationDisplay = document.getElementById('selection-duration-display');
+        const cutterOutputName = document.getElementById('cutter-output-name');
+        const cutterFadeSelect = document.getElementById('cutter-fade-select');
+        const cutterFadeDuration = document.getElementById('cutter-fade-duration');
+        const cutterDownloadBtn = document.getElementById('cutter-download-btn');
+        const cutterStatus = document.getElementById('cutter-status');
+
+        let audioCtx = null;
+        let audioBuffer = null;
+        let sourceNode = null;
+        let isPlaying = false;
+        let playStartTime = 0;
+        let playOffset = 0;
+        let animFrameId = null;
+        let previewMode = false;
+
+        let selStartRatio = 0;
+        let selEndRatio = 1;
+
+        const getAudioCtx = () => {
+            if (!audioCtx || audioCtx.state === 'closed') {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            return audioCtx;
+        };
+
+        const formatTime = (secs, showMs = true) => {
+            const m = Math.floor(secs / 60);
+            const s = Math.floor(secs % 60);
+            const ms = Math.round((secs % 1) * 1000);
+            if (showMs) {
+                return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(ms).padStart(3, '0')}`;
+            }
+            return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        };
+
+        const parseTime = (str) => {
+            if (!str) return null;
+            str = str.trim();
+            const match = str.match(/^(\d+):(\d{2})(?:[.,](\d{1,3}))?$/);
+            if (!match) return null;
+            const m = parseInt(match[1], 10);
+            const s = parseInt(match[2], 10);
+            const ms = match[3] ? parseInt(match[3].padEnd(3, '0'), 10) : 0;
+            return m * 60 + s + ms / 1000;
+        };
+
+        const drawWaveform = () => {
+            if (!audioBuffer) return;
+            const ctx = waveformCanvas.getContext('2d');
+            const W = waveformCanvas.width;
+            const H = waveformCanvas.height;
+            ctx.clearRect(0, 0, W, H);
+
+            const data = audioBuffer.getChannelData(0);
+            const step = Math.ceil(data.length / W);
+            const amp = H / 2;
+
+            const isDark = document.body.classList.contains('dark');
+            const barColor = isDark ? '#4f46e5' : '#818cf8';
+            const selColor = isDark ? '#6366f1' : '#4f46e5';
+
+            const sx = Math.round(selStartRatio * W);
+            const ex = Math.round(selEndRatio * W);
+
+            for (let i = 0; i < W; i++) {
+                let min = 0, max = 0;
+                for (let j = 0; j < step; j++) {
+                    const v = data[i * step + j] || 0;
+                    if (v < min) min = v;
+                    if (v > max) max = v;
+                }
+                ctx.fillStyle = (i >= sx && i <= ex) ? selColor : barColor;
+                ctx.fillRect(i, amp - max * amp, 1, Math.max(1, (max - min) * amp));
+            }
+        };
+
+        const updateHandles = () => {
+            if (!audioBuffer) return;
+            const wrapperW = waveformCanvas.offsetWidth;
+            const sx = selStartRatio * wrapperW;
+            const ex = selEndRatio * wrapperW;
+
+            handleStart.style.left = sx + 'px';
+            handleEnd.style.left = ex + 'px';
+            selectionOverlay.style.left = sx + 'px';
+            selectionOverlay.style.width = (ex - sx) + 'px';
+
+            const startSec = selStartRatio * audioBuffer.duration;
+            const endSec = selEndRatio * audioBuffer.duration;
+            handleStartLabel.textContent = formatTime(startSec, false);
+            handleEndLabel.textContent = formatTime(endSec, false);
+
+            startTimeInput.value = formatTime(startSec);
+            endTimeInput.value = formatTime(endSec);
+
+            const selDur = endSec - startSec;
+            selectionDurationDisplay.textContent = formatTime(Math.max(0, selDur));
+        };
+
+        const resizeCanvas = () => {
+            if (!waveformCanvas) return;
+            const wrapper = waveformCanvas.parentElement;
+            waveformCanvas.width = wrapper.offsetWidth;
+            waveformCanvas.height = wrapper.offsetHeight;
+            drawWaveform();
+            updateHandles();
+        };
+
+        const loadAudioFile = async (file) => {
+            stopPlayback();
+            audioBuffer = null;
+
+            try {
+                const ac = getAudioCtx();
+                const arrayBuffer = await file.arrayBuffer();
+                audioBuffer = await ac.decodeAudioData(arrayBuffer);
+            } catch (e) {
+                cutterStatus.style.display = 'block';
+                cutterStatus.className = 'status error';
+                cutterStatus.textContent = '오디오 디코딩 실패: ' + e.message;
+                return;
+            }
+
+            selStartRatio = 0;
+            selEndRatio = 1;
+
+            cutterFilename.textContent = file.name;
+            cutterDuration.textContent = '(' + formatTime(audioBuffer.duration) + ')';
+            cutterOutputName.value = file.name.replace(/\.[^.]+$/, '') + '_cut.mp3';
+
+            cutterDropZone.style.display = 'none';
+            cutterEditor.style.display = 'block';
+            cutterStatus.style.display = 'none';
+
+            setTimeout(() => {
+                resizeCanvas();
+            }, 50);
+        };
+
+        // Drop zone
+        cutterDropZone.onclick = () => cutterFileInput.click();
+        cutterFileInput.onchange = (e) => { if (e.target.files[0]) loadAudioFile(e.target.files[0]); };
+        cutterDropZone.ondragover = (e) => { e.preventDefault(); cutterDropZone.classList.add('dragover'); };
+        cutterDropZone.ondragleave = () => cutterDropZone.classList.remove('dragover');
+        cutterDropZone.ondrop = (e) => {
+            e.preventDefault();
+            cutterDropZone.classList.remove('dragover');
+            const f = e.dataTransfer.files[0];
+            if (f && f.type.startsWith('audio/')) loadAudioFile(f);
+        };
+
+        cutterResetBtn.onclick = () => {
+            stopPlayback();
+            audioBuffer = null;
+            cutterEditor.style.display = 'none';
+            cutterDropZone.style.display = '';
+            cutterFileInput.value = '';
+        };
+
+        window.addEventListener('resize', resizeCanvas);
+
+        // ---- Handle dragging ----
+        let dragging = null;
+
+        const getWrapper = () => waveformCanvas.parentElement;
+
+        const ratioFromEvent = (e) => {
+            const rect = getWrapper().getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+        };
+
+        const onDragMove = (e) => {
+            if (!dragging || !audioBuffer) return;
+            e.preventDefault();
+            const r = ratioFromEvent(e);
+            if (dragging === 'start') {
+                selStartRatio = Math.min(r, selEndRatio - 0.001);
+            } else if (dragging === 'end') {
+                selEndRatio = Math.max(r, selStartRatio + 0.001);
+            } else if (dragging === 'canvas') {
+                const rect = getWrapper().getBoundingClientRect();
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                seekTo((clientX - rect.left) / rect.width * audioBuffer.duration);
+                return;
+            }
+            drawWaveform();
+            updateHandles();
+        };
+
+        const onDragEnd = () => { dragging = null; };
+
+        handleStart.addEventListener('mousedown', (e) => { e.stopPropagation(); dragging = 'start'; });
+        handleEnd.addEventListener('mousedown', (e) => { e.stopPropagation(); dragging = 'end'; });
+
+        getWrapper().addEventListener('mousedown', (e) => {
+            if (dragging) return;
+            const r = ratioFromEvent(e);
+            const distStart = Math.abs(r - selStartRatio);
+            const distEnd = Math.abs(r - selEndRatio);
+            if (distStart < 0.03) {
+                dragging = 'start';
+            } else if (distEnd < 0.03) {
+                dragging = 'end';
+            } else {
+                dragging = 'canvas';
+            }
+        });
+
+        document.addEventListener('mousemove', onDragMove);
+        document.addEventListener('mouseup', onDragEnd);
+
+        // Touch support
+        handleStart.addEventListener('touchstart', (e) => { e.stopPropagation(); dragging = 'start'; }, { passive: false });
+        handleEnd.addEventListener('touchstart', (e) => { e.stopPropagation(); dragging = 'end'; }, { passive: false });
+        document.addEventListener('touchmove', onDragMove, { passive: false });
+        document.addEventListener('touchend', onDragEnd);
+
+        // ---- Time inputs ----
+        const applyTimeInput = () => {
+            if (!audioBuffer) return;
+            const s = parseTime(startTimeInput.value);
+            const e2 = parseTime(endTimeInput.value);
+            if (s !== null && e2 !== null && s < e2) {
+                selStartRatio = Math.max(0, Math.min(s / audioBuffer.duration, 1));
+                selEndRatio = Math.max(0, Math.min(e2 / audioBuffer.duration, 1));
+                drawWaveform();
+                updateHandles();
+            }
+        };
+
+        startTimeInput.addEventListener('change', applyTimeInput);
+        endTimeInput.addEventListener('change', applyTimeInput);
+
+        // ---- Playback ----
+        const stopPlayback = () => {
+            if (sourceNode) {
+                try { sourceNode.stop(); } catch (_) {}
+                sourceNode = null;
+            }
+            isPlaying = false;
+            if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
+            cutterPlayBtn.innerHTML = '<i class="fas fa-play"></i>';
+        };
+
+        const seekTo = (secs) => {
+            playOffset = Math.max(0, Math.min(secs, audioBuffer ? audioBuffer.duration : 0));
+            cutterCurrentTime.textContent = formatTime(playOffset, false);
+            playhead.style.left = (playOffset / audioBuffer.duration * 100) + '%';
+            if (isPlaying) {
+                stopPlayback();
+                startPlayback(playOffset);
+            }
+        };
+
+        const startPlayback = (offsetSec, endSec = null) => {
+            if (!audioBuffer) return;
+            stopPlayback();
+            const ac = getAudioCtx();
+            if (ac.state === 'suspended') ac.resume();
+
+            sourceNode = ac.createBufferSource();
+            sourceNode.buffer = audioBuffer;
+
+            const duration = endSec !== null ? endSec - offsetSec : undefined;
+            sourceNode.connect(ac.destination);
+            sourceNode.start(0, offsetSec, duration);
+            playStartTime = ac.currentTime;
+            playOffset = offsetSec;
+            isPlaying = true;
+            cutterPlayBtn.innerHTML = '<i class="fas fa-pause"></i>';
+
+            const stopAt = endSec !== null ? endSec : audioBuffer.duration;
+
+            const tick = () => {
+                if (!isPlaying) return;
+                const current = playOffset + (ac.currentTime - playStartTime);
+                if (current >= stopAt) {
+                    stopPlayback();
+                    playOffset = previewMode ? selStartRatio * audioBuffer.duration : 0;
+                    playhead.style.left = (playOffset / audioBuffer.duration * 100) + '%';
+                    cutterCurrentTime.textContent = formatTime(playOffset, false);
+                    return;
+                }
+                cutterCurrentTime.textContent = formatTime(current, false);
+                playhead.style.left = (current / audioBuffer.duration * 100) + '%';
+                animFrameId = requestAnimationFrame(tick);
+            };
+            animFrameId = requestAnimationFrame(tick);
+
+            sourceNode.onended = () => {
+                if (isPlaying) {
+                    stopPlayback();
+                    playOffset = previewMode ? selStartRatio * audioBuffer.duration : 0;
+                }
+            };
+        };
+
+        cutterPlayBtn.onclick = () => {
+            if (!audioBuffer) return;
+            previewMode = false;
+            if (isPlaying) {
+                const current = playOffset + (audioCtx.currentTime - playStartTime);
+                playOffset = current;
+                stopPlayback();
+            } else {
+                startPlayback(playOffset);
+            }
+        };
+
+        cutterPreviewBtn.onclick = () => {
+            if (!audioBuffer) return;
+            previewMode = true;
+            const s = selStartRatio * audioBuffer.duration;
+            const e2 = selEndRatio * audioBuffer.duration;
+            startPlayback(s, e2);
+        };
+
+        // ---- Keyboard shortcuts ----
+        document.addEventListener('keydown', (e) => {
+            const cutterPage = document.getElementById('page-cutter');
+            if (!cutterPage.classList.contains('active')) return;
+            if (!audioBuffer) return;
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+            if (e.code === 'Space') {
+                e.preventDefault();
+                cutterPlayBtn.click();
+            }
+        });
+
+        // ---- Export / Download ----
+        cutterDownloadBtn.onclick = async () => {
+            if (!audioBuffer) return;
+
+            const startSec = selStartRatio * audioBuffer.duration;
+            const endSec = selEndRatio * audioBuffer.duration;
+            if (endSec <= startSec) {
+                cutterStatus.style.display = 'block';
+                cutterStatus.className = 'status error';
+                cutterStatus.textContent = '유효한 구간을 선택하세요.';
+                return;
+            }
+
+            cutterStatus.style.display = 'block';
+            cutterStatus.className = 'status info';
+            cutterStatus.textContent = '오디오 처리 중...';
+            cutterDownloadBtn.disabled = true;
+
+            try {
+                const ac = getAudioCtx();
+                const sampleRate = audioBuffer.sampleRate;
+                const numChannels = audioBuffer.numberOfChannels;
+                const startSample = Math.floor(startSec * sampleRate);
+                const endSample = Math.floor(endSec * sampleRate);
+                const frameCount = endSample - startSample;
+
+                const offlineCtx = new OfflineAudioContext(numChannels, frameCount, sampleRate);
+                const src = offlineCtx.createBufferSource();
+                src.buffer = audioBuffer;
+
+                const gainNode = offlineCtx.createGain();
+                gainNode.gain.setValueAtTime(1, 0);
+
+                const fadeType = cutterFadeSelect.value;
+                const fadeDur = Math.min(parseFloat(cutterFadeDuration.value) || 1, (endSec - startSec) / 2);
+                const durSec = endSec - startSec;
+
+                if (fadeType === 'in' || fadeType === 'both') {
+                    gainNode.gain.setValueAtTime(0, 0);
+                    gainNode.gain.linearRampToValueAtTime(1, fadeDur);
+                }
+                if (fadeType === 'out' || fadeType === 'both') {
+                    gainNode.gain.setValueAtTime(1, durSec - fadeDur);
+                    gainNode.gain.linearRampToValueAtTime(0, durSec);
+                }
+
+                src.connect(gainNode);
+                gainNode.connect(offlineCtx.destination);
+                src.start(0, startSec, durSec);
+
+                const rendered = await offlineCtx.startRendering();
+                const wav = audioBufferToWav(rendered);
+                const blob = new Blob([wav], { type: 'audio/wav' });
+                const url = URL.createObjectURL(blob);
+
+                let outName = cutterOutputName.value.trim() || 'output';
+                if (!/\.[a-z0-9]+$/i.test(outName)) outName += '.wav';
+                else outName = outName.replace(/\.[^.]+$/, '.wav');
+
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = outName;
+                a.click();
+                setTimeout(() => URL.revokeObjectURL(url), 100);
+
+                cutterStatus.className = 'status success';
+                cutterStatus.textContent = `완료! ${outName} 다운로드됨`;
+            } catch (err) {
+                cutterStatus.className = 'status error';
+                cutterStatus.textContent = '오류: ' + err.message;
+            } finally {
+                cutterDownloadBtn.disabled = false;
+            }
+        };
+
+        // ---- WAV encoder ----
+        function audioBufferToWav(buffer) {
+            const numChannels = buffer.numberOfChannels;
+            const sampleRate = buffer.sampleRate;
+            const format = 1; // PCM
+            const bitDepth = 16;
+            const bytesPerSample = bitDepth / 8;
+            const blockAlign = numChannels * bytesPerSample;
+            const numFrames = buffer.length;
+            const dataSize = numFrames * blockAlign;
+            const bufSize = 44 + dataSize;
+            const arrayBuffer = new ArrayBuffer(bufSize);
+            const view = new DataView(arrayBuffer);
+
+            const writeStr = (offset, str) => { for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i)); };
+            writeStr(0, 'RIFF');
+            view.setUint32(4, 36 + dataSize, true);
+            writeStr(8, 'WAVE');
+            writeStr(12, 'fmt ');
+            view.setUint32(16, 16, true);
+            view.setUint16(20, format, true);
+            view.setUint16(22, numChannels, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * blockAlign, true);
+            view.setUint16(32, blockAlign, true);
+            view.setUint16(34, bitDepth, true);
+            writeStr(36, 'data');
+            view.setUint32(40, dataSize, true);
+
+            let offset = 44;
+            for (let i = 0; i < numFrames; i++) {
+                for (let ch = 0; ch < numChannels; ch++) {
+                    const sample = Math.max(-1, Math.min(1, buffer.getChannelData(ch)[i]));
+                    view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+                    offset += 2;
+                }
+            }
+            return arrayBuffer;
+        }
+    })();
 
     startBtn.onclick = async () => {
         syncCurrentPageData();
